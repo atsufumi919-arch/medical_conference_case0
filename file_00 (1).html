@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>臨床推論シミュレーター：File.00 (チュートリアル)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root {
+            --medical-green: #004d40;
+            --danger-red: #d32f2f;
+            --safe-green: #2e7d32;
+            --bg-gray: #f1f5f9;
+            --text-dark: #1e293b;
+            --border-color: #cbd5e1;
+        }
+
+        body { font-family: 'Noto Sans JP', sans-serif; background-color: var(--bg-gray); margin: 0; padding: 12px; color: var(--text-dark); height: 100vh; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
+        
+        /* 共通ボタン */
+        .btn { padding: 12px 15px; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s; display: flex; align-items: center; gap: 8px; background: #fff; width: 100%; text-align: left; margin-bottom: 10px; box-sizing: border-box; line-height: 1.4; color: var(--text-dark); }
+        .btn:hover:not(:disabled) { border-color: var(--medical-green); background: #f8fafc; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; background: #f1f5f9; }
+        .btn-primary { background: var(--medical-green); color: white; border-color: var(--medical-green); justify-content: center; text-align: center; }
+        .btn-primary:hover:not(:disabled) { background: #00332a; }
+
+        /* スタート画面 */
+        #view-start { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100vh; width: 100%; background: #e2e8f0; position: absolute; top: 0; left: 0; z-index: 100; overflow-y: auto; padding: 40px 20px; box-sizing: border-box; }
+        .start-header { background: var(--medical-green); color: white; padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 800px; }
+        .start-header h1 { margin: 0 0 10px 0; font-size: 28px; }
+        .start-header p { margin: 0; font-size: 16px; opacity: 0.9; }
+        
+        .patient-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; width: 100%; max-width: 1100px; }
+        .patient-card { background: white; border: 2px solid var(--medical-green); border-radius: 12px; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden; }
+        .patient-card:hover:not(.locked-card) { transform: translateY(-5px); box-shadow: 0 12px 20px rgba(0,77,64,0.15); }
+        .p-card-header { background: var(--medical-green); color: white; padding: 12px; font-weight: bold; text-align: center; font-size: 15px; }
+        .p-card-body { padding: 15px; font-size: 13px; line-height: 1.5; flex-grow: 1; }
+        .p-card-body .label { color: #64748b; font-size: 11px; font-weight: bold; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; margin-bottom: 5px; display: block; margin-top: 10px;}
+        .p-card-body .label:first-child { margin-top: 0; }
+        .locked-card { opacity: 0.6; filter: grayscale(100%); cursor: not-allowed; border-color: #94a3b8; }
+        .locked-card .p-card-header { background: #64748b; }
+
+        /* メイン3カラムレイアウト */
+        #view-main { display: none; grid-template-columns: 280px 1fr 320px; gap: 12px; padding: 5px; height: 98vh; box-sizing: border-box; max-width: 1650px; margin: 0 auto; width: 100%; }
+
+        .panel { background: #ffffff; border: 2px solid var(--medical-green); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); height: 100%; }
+        .panel-header { background: var(--medical-green); color: white; padding: 10px 15px; font-weight: bold; font-size: 14px; flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
+        .panel-content { padding: 12px; overflow-y: auto; flex-grow: 1; position: relative; display: flex; flex-direction: column; }
+
+        /* 左パネル：プロファイル */
+        .vital-box { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 12px; }
+        .vital-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12.5px; }
+        .vital-val { font-weight: bold; font-size: 13.5px; }
+        .text-red { color: var(--danger-red); font-weight: bold; }
+
+        .human-scanner { background: #0f172a; border-radius: 6px; height: 150px; position: relative; margin-bottom: 12px; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        .silhouette { height: 90%; stroke: #38bdf8; stroke-width: 2; opacity: 0.8; fill: none; }
+        .symptom-tag { position: absolute; background: rgba(220, 38, 38, 0.2); border: 1px solid #ef4444; color: #fca5a5; font-size: 10px; padding: 3px 6px; border-radius: 4px; font-weight: bold; }
+
+        .timeline-box { background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; font-size: 12px; line-height: 1.5; }
+
+        /* 中央ビュー共通 */
+        .center-view { display: none; flex-direction: column; height: 100%; }
+        .center-view.active { display: flex; }
+
+        /* 問診チャット */
+        .chat-area { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding: 20px 15px; background: #f8fafc; }
+        .chat-bubble { max-width: 80%; padding: 10px 15px; border-radius: 12px; font-size: 13.5px; line-height: 1.5; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .bubble-me { background: #e6f4ea; border: 1px solid #a7f3d0; color: #064e3b; align-self: flex-end; border-bottom-right-radius: 2px; } 
+        .bubble-fam { background: #ffffff; border: 1px solid var(--border-color); color: #333; align-self: flex-start; border-bottom-left-radius: 2px; } 
+        .bubble-mentor { background: #fff1f2; border: 1px solid #fecdd3; color: #9f1239; align-self: flex-start; border-bottom-left-radius: 2px; } 
+        .speaker-name { font-size: 11px; font-weight: bold; margin-bottom: 5px; display: block; opacity: 0.8; }
+
+        /* 仮説カード */
+        .hypo-list-vertical { display: flex; flex-direction: column; gap: 15px; padding: 10px 0; }
+        .hypo-row-card { display: flex; background: white; border: 2px solid var(--medical-green); border-radius: 8px; overflow: hidden; box-shadow: 0 3px 6px rgba(0,0,0,0.05); transition: 0.2s; }
+        .hypo-row-card:hover:not(.excluded) { transform: translateX(4px); box-shadow: 0 6px 12px rgba(0,77,64,0.15); }
+        .hr-badge { background: var(--medical-green); color: white; width: 130px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; font-size: 14px; padding: 10px; text-align: center; flex-shrink: 0; }
+        .hr-body { padding: 15px; flex-grow: 1; font-size: 13px; display: flex; flex-direction: column; gap: 6px; }
+        .hr-row { display: flex; align-items: flex-start; gap: 10px; }
+        .hr-label { color: #64748b; font-size: 11px; font-weight: bold; width: 55px; flex-shrink: 0; padding-top: 2px;}
+        .hr-action { width: 160px; display: flex; align-items: center; justify-content: center; padding: 15px; border-left: 1px solid #e2e8f0; background: #f8fafc; flex-shrink: 0; }
+        .hypo-row-card.excluded { opacity: 0.6; filter: grayscale(100%); cursor: not-allowed; border-color: #cbd5e1; }
+        .hypo-row-card.excluded .hr-badge { background: #94a3b8; text-decoration: line-through; }
+
+        /* 検査結果ボックス */
+        .test-result-box { background: #fff; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); width: 85%; max-width: 650px; margin: 0 auto; }
+        .test-title { font-size: 16px; color: var(--medical-green); font-weight: bold; border-bottom: 2px solid var(--medical-green); padding-bottom: 8px; margin-top: 0; margin-bottom: 15px; }
+        .lab-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 15px; }
+        .lab-table th { background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid var(--border-color); }
+        .lab-table td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
+        .val-abnormal { color: #e11d48; font-weight: bold; }
+        .mentor-comment { background: #fff1f2; border-left: 4px solid #f43f5e; padding: 12px; border-radius: 4px; font-size: 13px; color: #9f1239; line-height: 1.5; font-weight: bold; margin-bottom: 15px;}
+
+        /* 器官マップ */
+        .map-wrapper { position: relative; width: 100%; min-height: 400px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden; flex-grow: 1; }
+        .node { position: absolute; background: white; border: 3px solid #94a3b8; border-radius: 10px; padding: 10px; width: 120px; text-align: center; font-size: 12px; font-weight: bold; color: #475569; transition: 0.2s; filter: grayscale(100%); opacity: 0.7; transform: translate(-50%, -50%); box-shadow: 0 4px 6px rgba(0,0,0,0.05); z-index:10; }
+        .node i { font-size: 20px; margin-bottom: 5px; display: block; }
+        .node.interactive { filter: grayscale(0%); opacity: 1; border-color: #1976d2; cursor: pointer; }
+        .node.interactive:hover { transform: translate(-50%, -50%) scale(1.05); border-color: var(--medical-green); box-shadow: 0 6px 12px rgba(0,77,64,0.2); }
+        .node.cleared { filter: grayscale(0%); opacity: 1; cursor: pointer; }
+        .node.cleared:hover { transform: translate(-50%, -50%) scale(1.05); box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
+        .node.cleared.ans-A { background: #fee2e2; border-color: #ef4444; color: #b91c1c; }
+        .node.cleared.ans-B { background: #dcfce7; border-color: #22c55e; color: #15803d; }
+        .node.cleared.ans-C { background: #f1f5f9; border-color: #64748b; color: #475569; }
+
+        /* フォーム */
+        .radio-group { display: flex; flex-direction: column; gap: 8px; background: #f8fafc; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 15px; }
+        .radio-group label { display: flex; align-items: center; font-size: 13px; cursor: pointer; font-weight: bold; padding: 10px; border-radius: 4px; background: #fff; border: 1px solid var(--border-color); transition: 0.2s;}
+        .radio-group label:hover { border-color: var(--medical-green); }
+        .radio-group input { margin-right: 10px; }
+        textarea.free-memo { width: 100%; height: 70px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 13px; resize: vertical; box-sizing: border-box; font-family: inherit; }
+
+        /* 右パネル（アクション＋レコード） */
+        .right-view { display: none; flex-direction: column; flex-shrink: 0; }
+        .right-view.active { display: flex; }
+        .instruction-box { background: #e0f2fe; padding: 12px; border-radius: 6px; border-left: 4px solid #0284c7; font-size: 12px; line-height: 1.5; color: #0f172a; margin-bottom: 15px; }
+        
+        .memo-box { background: #fffde7; border: 2px solid #fbc02d; border-radius: 8px; display: flex; flex-direction: column; flex-grow: 1; overflow: hidden; margin-top: 10px; min-height: 280px; }
+        .memo-box h3 { margin: 0; padding: 10px 12px; background: #fef08a; font-size: 13px; color: #b45309; border-bottom: 1px solid #fbc02d; flex-shrink: 0; font-weight: bold; }
+        .memo-list { list-style: none; padding: 12px; margin: 0; font-size: 12px; line-height: 1.5; color: #333; overflow-y: auto; flex-grow: 1; }
+        .memo-list li { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #cbd5e1; }
+        .memo-list li:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .memo-list li strong { color: var(--medical-green); }
+
+        /* PDF関連スタイル */
+        #pdf-wrapper { display: none; }
+        #pdf-render-area { display: flex; flex-direction: column; width: 794px !important; height: 1123px !important; background: white; color: #222; padding: 25px 35px !important; box-sizing: border-box !important; margin: 0 !important; overflow: hidden !important; }
+        .pdf-title { border-bottom: 2px solid #004d40; padding-bottom: 5px; margin-bottom: 8px; font-size: 20px; color: #004d40; font-weight: bold; text-align: left; margin-top:0; }
+        .pdf-meta { display: flex; justify-content: space-between; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; font-size: 11px; font-weight: bold; }
+        .pdf-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 11px; table-layout: fixed; }
+        .pdf-table th { background: #f0f4f8; border: 1px solid #ccc; padding: 4px 6px; text-align: left; font-weight: bold;}
+        .pdf-table td { border: 1px solid #ccc; padding: 4px 6px; vertical-align: top; line-height: 1.35; overflow-wrap: anywhere; }
+        #pdf-loading-toast { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255,255,255,0.85); z-index: 9999999; display: none; flex-direction: column; justify-content: center; align-items: center; }
+    </style>
+</head>
+<body>
+
+<div id="pdf-loading-toast">
+    <i class="fa-solid fa-spinner fa-spin" style="font-size:40px; color:var(--medical-green); margin-bottom:15px;"></i>
+    <div style="font-size:18px; font-weight:bold; color:var(--medical-green);">症例報告書（PDF）を作成しています...</div>
+</div>
+
+<button id="ai-roleplay-btn" onclick="startRoleplay()" style="position:fixed; bottom:20px; right:20px; z-index:9999; padding:12px 20px; background:#4f46e5; color:white; border:none; border-radius:30px; font-weight:bold; font-size:14px; box-shadow:0 4px 10px rgba(0,0,0,0.2); cursor:pointer; transition:0.3s;" onmouseover="this.style.background='#4338ca'" onmouseout="this.style.background='#4f46e5'">
+    <i class="fa-solid fa-robot"></i> AIロールプレイを起動
+</button>
+
+<div id="view-start">
+    <div class="start-header">
+        <h1><i class="fa-solid fa-hospital-user"></i> 医療カンファレンス</h1>
+        <p>〜 臨床推論シミュレーター（チュートリアル） 〜</p>
+    </div>
+    
+    <h2 style="color: var(--medical-green); margin-bottom: 30px;">チュートリアルを開始します</h2>
+    
+    <div class="patient-grid">
+        <div class="patient-card" onclick="startCase('file00')">
+            <div class="p-card-header" style="background:#0284c7;">File.00 (Tutorial)</div>
+            <div class="p-card-body">
+                <span class="label">患者データ</span>
+                <strong>16歳 男性</strong><br>
+                <span class="label">病名（仮）</span>
+                不明（けいれん・意識消失）<br>
+                <span class="label">かんたんな症状</span>
+                部活中に突然けいれんを起こして意識を失い倒れた。
+            </div>
+            <button class="btn" style="margin:0; border-radius:0; border:none; background:#0284c7; color:white; justify-content:center;" onclick="startCase('file00')">この患者を担当する</button>
+        </div>
+        <div class="patient-card locked-card">
+            <div class="p-card-header">File.01</div><div class="p-card-body"><span class="label">患者データ</span><strong>35歳 女性</strong></div><button class="btn" disabled><i class="fa-solid fa-lock"></i> 未開放</button>
+        </div>
+        <div class="patient-card locked-card">
+            <div class="p-card-header">File.02</div><div class="p-card-body"><span class="label">患者データ</span><strong>20代 男性</strong></div><button class="btn" disabled><i class="fa-solid fa-lock"></i> 未開放</button>
+        </div>
+    </div>
+</div>
+
+<div class="app-container" id="view-main">
+    
+    <div class="panel">
+        <div class="panel-header"><i class="fa-solid fa-clipboard-user"></i> 患者プロファイル</div>
+        <div class="panel-content">
+            <h2 style="font-size: 18px; margin: 0 0 5px 0; color: #0f172a; border:none; padding:0;">16歳 男性 (File.00)</h2>
+            <p style="font-size: 13px; font-weight: bold; color: var(--medical-green); margin: 0 0 12px 0;">標準体型（部活生）</p>
+
+            <div class="vital-box">
+                <div class="vital-row"><span>血圧</span><span class="vital-val">100/60 mmHg</span></div>
+                <div class="vital-row"><span>心拍</span><span class="vital-val">90 回/分</span></div>
+                <div class="vital-row"><span>体温</span><span class="vital-val">36.5 ℃</span></div>
+            </div>
+
+            <div class="human-scanner">
+                <div class="symptom-tag" style="top:10px; left:10px;">けいれん・意識消失</div>
+                <div class="symptom-tag" style="top:90px; right:10px;">多量の尿</div>
+                <svg class="silhouette" viewBox="0 0 100 200">
+                    <path d="M 45 32 L 30 35 L 15 90 L 22 92 L 32 60 L 32 100 L 35 190 L 45 190 L 48 115 Q 50 105 52 115 L 55 190 L 65 190 L 68 100 L 68 60 L 78 92 L 85 90 L 70 35 L 55 32 Z" />
+                    <circle cx="50" cy="20" r="10" fill="none" />
+                </svg>
+            </div>
+
+            <div class="timeline-box">
+                <p style="margin: 0 0 6px 0; font-weight: bold; color: #0f172a; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
+                    <i class="fa-solid fa-clock-rotate-left"></i> タイムライン
+                </p>
+                <div style="margin-bottom: 3px;">1. 炎天下での部活動中。</div>
+                <div class="text-red" style="margin-bottom: 3px;">2. 突然けいれんを起こす。</div>
+                <div class="text-red">3. 意識を失い救急搬送。</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel" style="padding: 0;">
+        
+        <div id="c-chat" class="center-view active">
+            <div class="panel-header" style="background:#0f766e;"><i class="fa-solid fa-comments"></i> 問診りれき（対話記録）</div>
+            <div class="chat-area" id="chat-box">
+                <div class="chat-bubble bubble-mentor">
+                    <span class="speaker-name"><i class="fa-solid fa-user-doctor"></i> 指導医</span>
+                    患者さんは現在意識がありません。右のパネルから質問を選び、付き添いの顧問の先生や看護師から情報を集めてください。熱中症やエネルギー不足など、様々な可能性を視野に入れて話を聞くんだ。
+                </div>
+            </div>
+        </div>
+
+        <div id="c-hypo" class="center-view">
+            <div class="panel-header"><i class="fa-solid fa-list-check"></i> 疑わしい病気と検査の選択</div>
+            <div class="panel-content" style="background: #f8fafc;">
+                <p style="font-size: 13px; font-weight: bold; margin-top: 0; color: #333;">問診結果から浮上した仮説です。最も疑わしい病気の検査を実行してください。</p>
+                <div id="hypo-list-area" class="hypo-list-vertical"></div>
+            </div>
+        </div>
+
+        <div id="c-test" class="center-view">
+            <div class="panel-header"><i class="fa-solid fa-microscope"></i> 検査結果</div>
+            <div class="panel-content" style="background:#f8fafc; align-items:center; justify-content:center;">
+                <div class="test-result-box" id="test-content"></div>
+            </div>
+        </div>
+
+        <div id="c-map" class="center-view">
+            <div class="panel-header"><i class="fa-solid fa-sitemap"></i> 体液の浸透圧調節システム：器官マップ</div>
+            <div class="panel-content" style="padding: 0; display: flex; flex-direction: column;">
+                <div style="padding: 10px 15px; background: #fff; border-bottom: 1px solid var(--border-color); font-size: 13px; font-weight: bold;">
+                    マップ上の器官をクリックし、それが「バグの元凶」か「防衛反応」か、それとも「正常（無関係）」か仕分けてください。<br>
+                    <span style="font-size:11px; font-weight:normal; color:#64748b;">※すべての器官の点検を終えると、MRI検査へ進めます。</span>
+                </div>
+                <div class="map-wrapper">
+                    <svg width="100%" height="100%" style="position:absolute; top:0; left:0; pointer-events:none; z-index:0;">
+                        <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="25" refY="3" orientation="auto"><path d="M0,0 L0,6 L8,3 z" fill="#94a3b8" /></marker></defs>
+                        <path d="M 50% 25% L 25% 65%" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+                        <path d="M 50% 25% L 75% 65%" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrow)" stroke-dasharray="4" />
+                        <path d="M 25% 65% L 75% 65%" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrow)" />
+                        <path d="M 50% 25% L 50% 85%" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#arrow)" stroke-dasharray="2" />
+                    </svg>
+                    <!-- フィードバック強調版の器官ノード -->
+                    <div class="node" id="node-blood" onclick="inspect('blood')" style="top:20%; left:50%;"><i class="fa-solid fa-droplet" style="color:var(--danger-red);"></i><div class="title">血液（血漿）</div></div>
+                    <div class="node" id="node-brain" onclick="inspect('brain')" style="top:65%; left:25%;"><i class="fa-solid fa-brain"></i><div class="title">間脳・下垂体</div></div>
+                    <div class="node" id="node-kidney" onclick="inspect('kidney')" style="top:65%; left:75%;"><i class="fa-solid fa-person-dots-from-line"></i><div class="title">腎臓</div></div>
+                    <div class="node" id="node-skin" onclick="inspect('skin')" style="top:85%; left:50%;"><i class="fa-solid fa-temperature-arrow-down"></i><div class="title">皮膚・汗腺</div></div>
+                </div>
+                <div style="text-align:center; padding: 10px;">
+                    <button id="btn-go-mri" class="btn btn-primary" style="display:none; width: auto; margin: 0 auto;" onclick="switchCenter('c-mri')">すべての点検完了：MRI検査へ進む <i class="fa-solid fa-arrow-right"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <div id="c-organ" class="center-view">
+            <div class="panel-header"><i class="fa-solid fa-magnifying-glass-chart"></i> 器官の稼働データ点検</div>
+            <div class="panel-content">
+                <h3 id="organ-title" style="margin-top: 0; color: var(--medical-green);">器官名</h3>
+                <table class="lab-table" id="organ-table"></table>
+
+                <div style="background: #fff; border: 1px solid var(--border-color); padding: 15px; border-radius: 8px;">
+                    <p style="font-weight: bold; margin-top: 0; font-size: 13px;">📝 判定：この器官の現状をどう評価しますか？</p>
+                    <div class="radio-group">
+                        <label style="color: #b91c1c;"><input type="radio" name="conc" value="A" onchange="checkAns('A')"> 🚨 [A] システムの故障・暴走（異常の元凶）</label>
+                        <label style="color: #15803d;"><input type="radio" name="conc" value="B" onchange="checkAns('B')"> 🛡️ [B] 正常な防衛反応（代償・指令中）</label>
+                        <label style="color: #475569;"><input type="radio" name="conc" value="C" onchange="checkAns('C')"> ⚪ [C] 正常・今回の原因とは無関係（除外）</label>
+                    </div>
+
+                    <div id="mentor-box" style="padding: 12px; border-radius: 6px; font-size: 13px; line-height: 1.5; margin: 15px 0; display: none; border: 1px solid var(--border-color); border-left: 4px solid var(--medical-green); background: #f8fafc; color: #333;"></div>
+
+                    <div style="margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px;">
+                        <label style="font-size: 12px; font-weight: bold; color: #475569; display: block; margin-bottom: 6px;">
+                            <i class="fa-solid fa-pen"></i> 考察メモ <span style="font-weight:normal; font-size:11px;">(※任意)</span>
+                        </label>
+                        <textarea id="organ-memo" class="free-memo" placeholder="指導医のコメントやデータを踏まえ、なぜその判定をしたか記述してください。"></textarea>
+                    </div>
+
+                    <button class="btn btn-primary" style="margin-top: 15px;" onclick="saveOrgan()">この判定を記録してマップに戻る</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="c-mri" class="center-view">
+            <div class="panel-header" style="background:#0f172a;"><i class="fa-solid fa-microscope"></i> STEP 4: 画像診断（MRI）</div>
+            <div class="panel-content" style="text-align: center; justify-content:center;">
+                <p style="font-weight: bold;">脳内で物理的な異常が起きていないか、MRIで確認します。</p>
+                <div style="background: #000; height: 250px; width:80%; margin: 0 auto; border-radius: 8px; position: relative; display: flex; justify-content: center; align-items: center; overflow: hidden;">
+                    <svg width="200" height="150" viewBox="0 0 200 150">
+                        <path d="M 50 130 C 30 130 20 80 50 30 C 80 -20 180 0 160 60 C 150 90 150 130 130 130 Z" fill="#333" />
+                        <circle id="mri-tumor" cx="100" cy="70" r="40" fill="#38bdf8" style="display:none; opacity: 0.6; animation: pulse 1s infinite alternate;" />
+                        <style>@keyframes pulse { from { filter: drop-shadow(0 0 2px #0284c7); } to { filter: drop-shadow(0 0 20px #0ea5e9); } }</style>
+                    </svg>
+                    <div id="mri-scan-line" style="position:absolute; top:0; left:0; width:100%; height:2px; background:#00ff00; box-shadow:0 0 10px #00ff00; animation:scan 2s infinite;"></div>
+                    <style>@keyframes scan { 0% {top:0;} 50% {top:100%;} 100% {top:0;} }</style>
+                </div>
+
+                <div id="mri-result" style="display:none; background: #f0f9ff; border: 2px solid #0284c7; padding: 20px; border-radius: 8px; text-align: left; margin: 20px auto 0; width: 80%; box-sizing:border-box;">
+                    <h3 style="color: #0284c7; margin-top: 0; font-size:15px;"><i class="fa-solid fa-flag"></i> 確定診断：水中毒（低ナトリウム血症による脳浮腫）</h3>
+                    <p style="font-size: 13px; line-height: 1.6; margin-bottom: 0;"><strong>ナトリウム濃度が低すぎると、浸透圧によって細胞内に水が流れ込み、脳浮腫（脳が腫れる）を起こして倒れるぞ。</strong><br>画像検査でも脳細胞が著しく膨張していることが確認できた。これがけいれんと意識消失の直接的な原因だ。</p>
+                </div>
+
+                <button id="btn-mri-start" class="btn btn-primary" style="margin: 20px auto 0; width:80%;" onclick="startMRI()">頭部MRIスキャンを開始する</button>
+                <button id="btn-to-report-center" class="btn btn-primary" style="margin: 20px auto 0; width:80%; display:none;" onclick="goToReport()">最終考察の記述へ進む <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+        </div>
+
+        <div id="c-report" class="center-view">
+            <div class="panel-header"><i class="fa-solid fa-file-signature"></i> STEP 5: 症例報告書の完成</div>
+            <div class="panel-content">
+                <div style="background: #f0f9ff; border: 2px solid #0284c7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="color: #0284c7; margin-top: 0; font-size:15px;"><i class="fa-solid fa-flag"></i> 確定診断：水中毒（低ナトリウム血症による脳浮腫）</h3>
+                    <p style="font-size: 13px; line-height: 1.6; margin-bottom: 0;"><strong>【MRI検査所見】</strong> 脳細胞の著しい膨張（脳浮腫）を認める。<br>
+                    大量の水摂取で血中のナトリウム濃度が極端に低下した結果、浸透圧の差によって細胞内に水分が流入したことが原因である。</p>
+                </div>
+
+                <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 20px; border-radius: 8px;">
+                    <h3 style="color: var(--medical-green); margin-top: 0; border-bottom: 2px solid var(--medical-green); padding-bottom: 5px; font-size:15px;">最終考察の記述</h3>
+                    <p style="font-size: 13px; font-weight: bold;">【課題】なぜ水だけを大量に飲むと倒れてしまうのか？</p>
+                    <p style="font-size: 12px; color: #64748b; margin-bottom: 15px;">指導医のヒントやこれまでの点検結果（右下のレコード）をつなぎ合わせて、体内で起きた一連のメカニズムを記述してください。</p>
+                    
+                    <textarea id="final-summary" class="free-memo" style="height: 150px;" placeholder="例：大量の真水を飲んで血液が薄まり、低ナトリウム血症（低浸透圧）になったことが元凶。間脳視床下部がこれを感知し、フィードバックが働いてバソプレシンの分泌を停止させた。その結果、腎臓での水の再吸収が減り、多量の尿を出して水分を排出しようとした。しかし間に合わず、細胞内に水が流れ込んで脳浮腫を起こした。"></textarea>
+                    
+                    <button class="btn btn-primary" style="margin-top: 20px;" onclick="generatePDF()"><i class="fa-solid fa-file-pdf"></i> PDFレポートを出力して提出</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="panel">
+        <div class="panel-header"><i class="fa-solid fa-location-crosshairs"></i> アクション & 記録</div>
+        
+        <div class="panel-content" style="padding: 12px; display: flex; flex-direction: column;">
+            
+            <div id="r-interview" class="right-view active">
+                <div class="instruction-box"><strong>STEP 1: 問診中</strong><br>ヒントを集めてください。</div>
+                <button class="btn btn-interview" id="btn-ask-A" onclick="ask('A')"><i class="fa-solid fa-comment-dots"></i> 倒れる前、どんな状況でしたか？</button>
+                <button class="btn btn-interview" id="btn-ask-B" onclick="ask('B')"><i class="fa-solid fa-comment-dots"></i> 朝食や塩分補給はしていましたか？</button>
+                <button class="btn btn-interview" id="btn-ask-C" onclick="ask('C')"><i class="fa-solid fa-comment-dots"></i> 倒れる直前に、何か口にしましたか？</button>
+                <button class="btn btn-interview" id="btn-ask-D" onclick="ask('D')"><i class="fa-solid fa-notes-medical"></i> 現在の様子はどうですか？</button>
+                <button class="btn btn-primary" style="margin-top: 5px;" onclick="goToHypothesis()">問診を終え、仮説の選択へ <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+
+            <div id="r-hypo" class="right-view">
+                <div class="instruction-box"><strong>STEP 2: 仮説の選択</strong><br>中央のパネルから仮説を選び、検査を実行してください。</div>
+                <button class="btn" style="justify-content:center; background:#f8fafc;" onclick="goBackToInterview()"><i class="fa-solid fa-arrow-left"></i> 問診に戻る</button>
+            </div>
+
+            <div id="r-action" class="right-view">
+                <div id="r-action-text" class="instruction-box" style="background:#f0fdf4; border-color:#16a34a; color:#064e3b; margin-bottom:5px;">
+                    <strong>指示：</strong><br>中央画面の指示に従って操作を進めてください。
+                </div>
+            </div>
+
+            <div class="memo-box">
+                <h3><i class="fa-solid fa-pen-nib"></i> 問診まとめ・点検レコード</h3>
+                <ul class="memo-list" id="memo-list">
+                    <li style="color: #94a3b8; text-align: center; border: none; padding-top: 20px;">検証や仕分けの記録が<br>ここに自動で追加されます。</li>
+                </ul>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div id="pdf-wrapper">
+    <div id="pdf-render-area">
+        <h1 class="pdf-title">症例報告書 (Clinical Case Report)</h1>
+        <div class="pdf-meta">
+            <span>演習課題: 体液の浸透圧調節システムの異常分析</span>
+            <span>患者: 16歳男性 / 主訴: 意識消失 / 体型: 標準（部活生）</span>
+        </div>
+
+        <h3 style="font-size: 13px; background: #f0f0f0; padding: 5px 10px; border-left: 5px solid #004d40; margin-top:0; margin-bottom: 8px;">1. 初期診断における検証事項（チュートリアル）</h3>
+        <div id="pdf-contradiction-text" style="font-size: 11px; line-height: 1.5; margin-bottom: 12px; padding: 0 5px;"></div>
+
+        <h3 style="font-size: 13px; background: #f0f0f0; padding: 5px 10px; border-left: 5px solid #004d40; margin-bottom: 8px;">2. 各器官の生体データ検証と論理的考察</h3>
+        <table class="pdf-table">
+            <thead>
+                <tr>
+                    <th style="width: 15%;">器官・部位</th>
+                    <th style="width: 33%;">検査項目(結果/正常値)</th>
+                    <th style="width: 14%; text-align:center;">判定</th>
+                    <th style="width: 38%;">データに基づく考察 (生徒の記述)</th>
+                </tr>
+            </thead>
+            <tbody id="pdf-inspect-table"></tbody>
+        </table>
+
+        <h3 style="font-size: 13px; background: #f0f0f0; padding: 5px 10px; border-left: 5px solid #004d40; margin-bottom: 8px;">3. 最終診断と病態のメカニズム</h3>
+        <div style="display: flex; gap: 15px; margin-bottom: 12px; align-items: flex-start;">
+            <div style="width: 120px; height: 90px; background: #222; border-radius: 4px; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
+                <span style="position:absolute; top:3px; left:3px; color:#10b981; font-size:7px; font-family:monospace;">MRI SCAN: BRAIN<br>T2-W</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="90" height="68" viewBox="0 0 200 150">
+                    <path d="M 50 130 C 30 130 20 80 50 30 C 80 -20 180 0 160 60 C 150 90 150 130 130 130 Z" fill="#444" />
+                    <circle cx="100" cy="70" r="35" fill="#38bdf8" opacity="0.8" />
+                </svg>
+            </div>
+            <div style="flex-grow: 1; font-size: 11px; line-height: 1.5;">
+                <p style="font-size: 12px; font-weight: bold; margin: 0 0 5px 0;">■ 確定診断： 水中毒（低ナトリウム血症による脳浮腫）</p>
+                <p style="margin:0;">● MRI検査の結果、脳に浮腫（腫れ）が確認されました。<br>大量の水分摂取で血中ナトリウム濃度が極端に低下（低浸透圧）した結果、浸透圧の差によって細胞内に水分が流入し、脳細胞が膨張したことが意識障害とけいれんの直接的な原因です。</p>
+            </div>
+        </div>
+
+        <div style="border: 1px solid #333; padding: 8px; margin-bottom: 20px;">
+            <p style="font-weight: bold; font-size: 11px; margin: 0 0 5px 0;">【チュートリアル確認項目】</p>
+            <ul style="font-size: 10.5px; margin: 0 0 10px 0; padding-left: 15px;">
+                <li><strong>今回のバグ（異常）の元凶：</strong> 大量の真水摂取による血液の極端な希釈（低浸透圧）</li>
+                <li><strong>正常に働いた防衛反応：</strong> 間脳視床下部（センサー）による感知、およびバソプレシン分泌の停止による腎臓（エフェクター）からの水分排出</li>
+            </ul>
+            <p style="font-weight: bold; font-size: 11px; margin: 0 0 5px 0; border-top: 1px dashed #333; padding-top: 5px;">【病態メカニズム: フィードバック制御はどう働いたか?】</p>
+            <p id="pdf-final-text" style="font-size: 10.5px; line-height: 1.5; white-space: pre-wrap; margin: 0; min-height: 40px;"></p>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; margin-top: auto;">
+            <div style="width: 45%;">
+                <p style="font-size: 11px; margin-bottom: 20px;">担当医(作成者) の署名</p>
+                <div style="border-bottom: 1px solid #333; height: 15px; position:relative;">
+                    <span style="position:absolute; right:0; bottom:2px; font-size:9px;">印 / サイン</span>
+                </div>
+            </div>
+            <div style="width: 45%;">
+                <p style="font-size: 11px; margin-bottom: 5px;">監査医(ピア・レビュー) の署名・評価</p>
+                <p style="font-size: 9px; color: #666; margin-bottom: 5px; margin-top:0;">※図のフィードバック機構と矛盾していないか確認してください。</p>
+                <div style="border-bottom: 1px solid #333; height: 15px; position:relative;">
+                    <span style="position:absolute; right:0; bottom:2px; font-size:9px;">監査医サイン</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 内部データベース (フィードバック強調版) ---
+    var DB = {
+        chat: {
+            qA: "倒れる前、どんな状況でしたか？",
+            aA: "今日は35度を超える猛暑日で、炎天下で汗だくになって練習していました。",
+            mA: "猛暑日での激しい運動と大量の汗か…熱中症による重度の脱水が怪しいな。",
+            sumA: "<strong>【状況】</strong> 猛暑日、炎天下での激しい運動と大量発汗（熱中症の疑い）",
+            
+            qB: "朝食や塩分補給はしていましたか？",
+            aB: "暑さで食欲がないと言って、朝はゼリー飲料だけでした。スポーツドリンクは甘いから嫌だと言って飲んでいません。",
+            mB: "塩分（電解質）を補給せずに運動していたのか。あるいはエネルギー枯渇による低血糖の可能性もあるな。重要なヒントだぞ。",
+            sumB: "<strong>【食事・補給】</strong> 朝食不足、塩分未補給（低血糖・電解質異常の疑い）",
+            
+            qC: "倒れる直前に、何か口にしましたか？",
+            aC: "喉が渇いたと言って、巨大な水筒に入れた水道の水をガブガブと何リットルも一気に飲んでいました。",
+            mC: "ただの『水だけ』を大量に一度に飲んだのか？発汗で塩分を失っている状態での大量の真水…これは少し嫌な予感がするな。",
+            sumC: "<strong>【直前の行動】</strong> 大量の水（真水）の一気飲み",
+
+            qD: "現在の様子はどうですか？",
+            aD: "救急処置室で点滴を受けていますが、ものすごい量の尿が出ています。",
+            mD: "多尿か。もし脱水症なら体は水分を確保するために尿を減らすはずだ。この矛盾はなんだ？",
+            sumD: "<strong>【現在の様子】</strong> 多量の尿が出ている（脱水症状と矛盾）"
+        },
+        tests: {
+            A: { 
+                title: "血液・尿検査（脱水状態の確認）", 
+                desc:"熱中症による重度の脱水が原因かを調べるため、血液の濃さと尿の濃さを調べます。", 
+                html: "<tr><td>ヘマトクリット(血液の濃さ)</td><td class='val-abnormal' style='color:#15803d; font-weight:bold;'>35 % (低下)</td><td>40〜50 %</td></tr><tr><td>尿比重(尿の濃さ)</td><td class='val-abnormal' style='color:#15803d; font-weight:bold;'>1.002 (著しく低い)</td><td>1.010〜1.030</td></tr>", 
+                mentor: "おかしい。もし熱中症（脱水）なら、血液はドロドロに濃縮され、尿は水分を逃さないよう濃縮されるはずだ。しかし血液も尿も『薄まって』いる。脱水ではなく、むしろ【体内に水分が多すぎる状態】だ！熱中症の仮説は棄却だ。", 
+                log: "熱中症(脱水)の除外：血液と尿が薄まっているため矛盾" 
+            },
+            B: { 
+                title: "血糖値測定", 
+                desc:"朝食不足と激しい運動によるエネルギー枯渇（低血糖発作）が原因かを調べます。", 
+                html: "<tr><td>随時血糖値</td><td>85 mg/dL</td><td>70〜140 mg/dL</td></tr>", 
+                mentor: "血糖値は正常範囲内だ。エネルギー不足が倒れた直接の原因ではないな。棄却して別の可能性（水分の異常など）を探ろう。", 
+                log: "低血糖の除外：血糖値は正常範囲内" 
+            },
+            C: { 
+                title: "血液・尿検査（電解質・浸透圧）", 
+                desc:"血中ナトリウム濃度と浸透圧を測定し、水中毒の可能性を調べます。", 
+                html: "<tr><td>血中ナトリウム(Na)</td><td class='val-abnormal' style='color:#e11d48; font-weight:bold;'>118 mEq/L (L)</td><td>135〜145 mEq/L</td></tr><tr><td>血漿浸透圧</td><td class='val-abnormal' style='color:#e11d48; font-weight:bold;'>240 mOsm/kg (L)</td><td>275〜290 mOsm/kg</td></tr><tr><td>抗利尿ホルモン(バソプレシン)</td><td class='val-abnormal' style='color:#e11d48; font-weight:bold;'>測定感度以下 (L)</td><td>0.3〜4.2 pg/mL</td></tr>", 
+                mentor: "やはり！塩分をとらずに水だけを大量に飲んだことで、血液が極端に薄まり「水中毒（低ナトリウム血症）」を起こしている。<br>ナトリウム濃度が低すぎると、浸透圧によって細胞内に水が流れ込み、脳浮腫（脳が腫れる）を起こして倒れるぞ。直ちにシステムマップで体内水分のフィードバック機構を確認しろ！", 
+                log: "血液検査：重篤な低ナトリウム血症・低浸透圧を確認" 
+            }
+        },
+        organs: {
+            blood: { 
+                name:"血液（血漿）", correct:'A', data:[{n:"Na濃度", v:"118 mEq/L (L)", ref:"135-145 mEq/L"}, {n:"血漿浸透圧", v:"240 mOsm/kg (L)", ref:"275-290 mOsm/kg"}], 
+                ok:"大量の真水によって血液が薄まり、低ナトリウム血症（低浸透圧）に陥っている。これが全てのシステム異常と症状を引き起こした根本的なバグの元凶だ。", 
+                ng:"正常値と比べて明らかに濃度が低すぎる。これが全身の防衛システム（フィードバック）を発動させている原因ではないか？" 
+            },
+            brain: { 
+                name:"間脳・下垂体", correct:'B', data:[{n:"浸透圧低下", v:"センサー感知", ref:"-"}, {n:"バソプレシン分泌", v:"測定感度以下 (L)", ref:"0.3-4.2 pg/mL"}], 
+                ok:"間脳視床下部が血液の『薄まり（低浸透圧）』をセンサーとして感知している。そして普段の脱水時とは逆に、下垂体後葉からのバソプレシン（水の再吸収を促すホルモン）の分泌を【停止】させたんだ。これ以上体内に水分を溜め込まないための、見事なフィードバック制御（防衛反応）だ。", 
+                ng:"間脳視床下部は血液の異常な薄まりを正しく感知している。バソプレシンは「水を再吸収する」ホルモンだ。今分泌が止まっているのは、異常なバグだろうか？それとも体を守るためだろうか？" 
+            },
+            kidney: { 
+                name:"腎臓", correct:'B', data:[{n:"水の再吸収量", v:"著しく低下", ref:"-"}, {n:"尿量", v:"多量 (H)", ref:"正常"}], 
+                ok:"バソプレシンという『水を再吸収しろ』という命令が来なくなったため、集合管での水の再吸収量が激減している。その結果、過剰な水分が多量の尿として排出されているんだ。視床下部からの指令停止を受けた、完璧なエフェクター（実行器官）としての働きだ。", 
+                ng:"体内の過剰な水分を捨てるために尿をたくさん作っている状態だ。これはシステムを正常化しようとする動き（エフェクターとしての働き）ではないか？" 
+            },
+            skin: { 
+                name:"皮膚・汗腺", correct:'C', data:[{n:"発汗量", v:"多量 (H)", ref:"正常"}, {n:"イオン(Na等)喪失", v:"あり (低下)", ref:"-"}], 
+                ok:"その通り。炎天下で体温を下げるための発汗は正常なホメオスタシスだ。たしかに汗と一緒にNaも失われたが、汗は血液より薄いため、発汗だけなら血液は『濃縮』されるはずだ。極端に血が薄まった真の元凶は他にあるぞ。", 
+                ng:"判定保留だ。汗と一緒にNaが失われたのは事実で、君の着眼点は非常に鋭いぞ！しかし、汗は血液より薄いため、発汗だけなら血液はむしろ『濃縮（脱水）』されるはずだ。極端に血が薄まった真の元凶は別にある。もう一度考えてみよう。" 
+            }
+        }
+    };
+
+    var flags = { askedA: false, askedB: false, askedC: false, askedD: false };
+    var tested = { A: false, B: false, C: false };
+    var clears = 0;
+    var currentKey = "";
+    var logs = { tests: [], inspects: [] };
+
+    function switchCenter(id) { 
+        var elements = document.querySelectorAll('.center-view');
+        for (var i = 0; i < elements.length; i++) {
+            elements[i].classList.remove('active');
+        }
+        document.getElementById(id).classList.add('active'); 
+    }
+    
+    function switchRight(id) { 
+        var elements = document.querySelectorAll('.right-view');
+        for (var i = 0; i < elements.length; i++) {
+            elements[i].classList.remove('active');
+        }
+        document.getElementById(id).classList.add('active'); 
+    }
+
+    function startCase(fileId) {
+        try {
+            document.getElementById('view-start').style.display = 'none';
+            document.getElementById('view-main').style.display = 'grid';
+            updateRightSummary();
+        } catch (e) {
+            alert("エラーが発生しました: " + e.message);
+        }
+    }
+
+    function ask(type) {
+        flags['asked'+type] = true;
+        document.getElementById('btn-ask-'+type).style.display = 'none';
+        
+        var chat = document.getElementById('chat-box');
+        chat.innerHTML += "<div class='chat-bubble bubble-me'><span class='speaker-name'><i class='fa-solid fa-user-doctor'></i> 担当医（自分）</span>" + DB.chat['q'+type] + "</div>";
+        chat.innerHTML += "<div class='chat-bubble bubble-fam'><span class='speaker-name'><i class='fa-solid fa-user'></i> 顧問・看護師</span>" + DB.chat['a'+type] + "</div>";
+        chat.innerHTML += "<div class='chat-bubble bubble-mentor'><span class='speaker-name'><i class='fa-solid fa-user-doctor'></i> 指導医</span>" + DB.chat['m'+type] + "</div>";
+        chat.scrollTop = chat.scrollHeight;
+        updateRightSummary();
+    }
+
+    function updateRightSummary() {
+        var list = document.getElementById('memo-list');
+        var html = "";
+        
+        if(flags.askedA) html += "<li><i class='fa-solid fa-clipboard-check'></i> " + DB.chat.sumA + "</li>";
+        if(flags.askedB) html += "<li><i class='fa-solid fa-clipboard-check'></i> " + DB.chat.sumB + "</li>";
+        if(flags.askedC) html += "<li><i class='fa-solid fa-clipboard-check'></i> " + DB.chat.sumC + "</li>";
+        if(flags.askedD) html += "<li><i class='fa-solid fa-clipboard-check'></i> " + DB.chat.sumD + "</li>";
+        
+        for (var i = 0; i < logs.tests.length; i++) {
+            var t = logs.tests[i];
+            if (t.indexOf('除外') !== -1) {
+                html += "<li style='color:var(--danger-red); font-weight:bold;'><i class='fa-solid fa-ban'></i> " + t + "</li>";
+            } else {
+                html += "<li style='color:var(--safe-green); font-weight:bold;'><i class='fa-solid fa-check-circle'></i> 確認：" + t + "</li>";
+            }
+        }
+
+        for (var j = 0; j < logs.inspects.length; j++) {
+            var ins = logs.inspects[j];
+            var warn = ins.isCorrect ? "" : " <span style='color:var(--danger-red); font-size:10px;'>(※要再考)</span>";
+            html += "<li><strong style='color:var(--medical-green);'>【点検】 " + ins.name + "</strong> ➔ <span>" + ins.status + "</span>" + warn + "</li>";
+        }
+
+        if(html === "") {
+            list.innerHTML = "<li style='color: #94a3b8; text-align: center; border: none; padding-top: 20px;'>検証や仕分けの記録が<br>ここに自動で追加されます。</li>";
+        } else { 
+            list.innerHTML = html; 
+            list.scrollTop = list.scrollHeight; 
+        }
+    }
+
+    function goToHypothesis() {
+        switchCenter('c-hypo'); switchRight('r-hypo'); renderHypoList(); 
+    }
+    
+    function goBackToInterview() {
+        switchCenter('c-chat'); switchRight('r-interview');
+    }
+
+    function renderHypoList() {
+        var html = "";
+        
+        // 仮説A: 熱中症 (ダミー)
+        html += "<div class='hypo-row-card " + (tested.A ? 'excluded' : '') + "'>" +
+                "<div class='hr-badge'>🥵 [A] 熱中症<br><span style='font-size:10px;'>(重度の脱水)</span></div>" +
+                "<div class='hr-body'>" +
+                "<div class='hr-row'><span class='hr-label'>原因</span>炎天下での大量発汗による水分不足。</div>" +
+                "<div class='hr-row'><span class='hr-label'>症状</span>意識障害、けいれんなど。</div>" +
+                "<div class='hr-row'><span class='hr-label'>検査方針</span>血液・尿検査（脱水状態の確認）</div>" +
+                "</div>" +
+                "<div class='hr-action'>" +
+                (tested.A ? "<span style='color:#94a3b8; font-weight:bold;'>❌ 棄却・除外済</span>" : "<button class='btn btn-primary' style='margin:0;' onclick='testHypo(\"A\")'>この検査を実行</button>") +
+                "</div></div>";
+
+        // 仮説B: 低血糖 (ダミー)
+        html += "<div class='hypo-row-card " + (tested.B ? 'excluded' : '') + "'>" +
+                "<div class='hr-badge'>📉 [B] 低血糖<br><span style='font-size:10px;'>(エネルギー枯渇)</span></div>" +
+                "<div class='hr-body'>" +
+                "<div class='hr-row'><span class='hr-label'>原因</span>朝食不足と激しい運動による糖分枯渇。</div>" +
+                "<div class='hr-row'><span class='hr-label'>症状</span>意識障害、けいれん、冷や汗など。</div>" +
+                "<div class='hr-row'><span class='hr-label'>検査方針</span>血糖値測定</div>" +
+                "</div>" +
+                "<div class='hr-action'>" +
+                (tested.B ? "<span style='color:#94a3b8; font-weight:bold;'>❌ 棄却・除外済</span>" : "<button class='btn btn-primary' style='margin:0;' onclick='testHypo(\"B\")'>この検査を実行</button>") +
+                "</div></div>";
+
+        // 仮説C: 水中毒 (正解) - 色を統一
+        html += "<div class='hypo-row-card " + (tested.C ? 'excluded' : '') + "'>" +
+                "<div class='hr-badge'>🧪 [C] 水中毒<br><span style='font-size:10px;'>(低ナトリウム)</span></div>" +
+                "<div class='hr-body'>" +
+                "<div class='hr-row'><span class='hr-label'>原因</span>塩分を伴わない大量の水分摂取。</div>" +
+                "<div class='hr-row'><span class='hr-label'>症状</span>けいれん、意識障害、多尿など。</div>" +
+                "<div class='hr-row'><span class='hr-label'>検査方針</span>血液・尿検査（電解質・浸透圧）</div>" +
+                "</div>" +
+                "<div class='hr-action'>" +
+                (tested.C ? "<span style='color:#94a3b8; font-weight:bold;'>✅ 確定済</span>" : "<button class='btn btn-primary' style='margin:0;' onclick='testHypo(\"C\")'>この検査を実行</button>") +
+                "</div></div>";
+
+        document.getElementById('hypo-list-area').innerHTML = html;
+    }
+
+    function testHypo(id) {
+        switchCenter('c-test'); 
+        var t = DB.tests[id];
+        
+        document.getElementById('test-content').innerHTML = 
+            "<div style='text-align:center; padding: 50px;'>" +
+            "<i class='fa-solid fa-spinner fa-spin' style='font-size:40px; color:var(--medical-green); margin-bottom:15px;'></i>" +
+            "<p style='font-size:15px; font-weight:bold; color:var(--medical-green);'>検査を実行中...</p>" +
+            "</div>";
+
+        setTimeout(function() {
+            var actionBtn = "";
+            if(id === 'C') {
+                actionBtn = "<button class='btn btn-primary' style='width:auto; display:inline-flex;' onclick='confirmHypoC(\"" + t.log + "\")'>バグの元凶を特定するため、システム点検へ進む <i class='fa-solid fa-arrow-right'></i></button>";
+            } else {
+                actionBtn = "<button class='btn' style='width:auto; display:inline-flex; justify-content:center; background:#f1f5f9;' onclick='rejectHypo(\"" + id + "\", \"" + t.log + "\")'><i class='fa-solid fa-xmark'></i> この仮説を除外して戻る</button>";
+            }
+
+            document.getElementById('test-content').innerHTML = 
+                "<h3 class='test-title'>プロトコール：" + t.title + "</h3>" +
+                "<div style='font-size:13px; color:#475569; margin-bottom:15px; background:#f1f5f9; padding:10px; border-radius:4px;'>" +
+                "<strong>【検査の目的と説明】：</strong><br>" + t.desc + "</div>" +
+                "<table class='lab-table'>" +
+                "<thead><tr><th>検査測定項目</th><th>測定結果</th><th>正常値（基準値）</th></tr></thead>" +
+                "<tbody>" + t.html + "</tbody></table>" +
+                "<div class='mentor-comment'>" +
+                "<strong><i class='fa-solid fa-user-doctor'></i> 指導医の臨床診断：</strong><br>" + t.mentor + "</div>" +
+                "<div style='text-align:center;'>" + actionBtn + "</div>";
+        }, 800);
+    }
+
+    function rejectHypo(id, log) { 
+        tested[id] = true; 
+        logs.tests.push(log); 
+        updateRightSummary(); 
+        goToHypothesis(); 
+    }
+
+    function confirmHypoC(log) {
+        tested.C = true; logs.tests.push(log); updateRightSummary();
+        switchCenter('c-map'); switchRight('r-action');
+        document.getElementById('r-action-text').innerHTML = "<strong>STEP 3: システム点検中</strong><br>中央のマップ上の器官をクリックし、それが「バグの元凶」か「防衛反応」か、それとも「正常（無関係）」か仕分けてください。";
+        var nodes = document.querySelectorAll('.node');
+        for(var i=0; i<nodes.length; i++){ nodes[i].classList.add('interactive'); }
+    }
+
+    function inspect(key) {
+        var nodeIdName = key;
+        var nodeEl = document.getElementById("node-" + nodeIdName);
+        if(!nodeEl.classList.contains('interactive') && !nodeEl.classList.contains('cleared')) return;
+        
+        currentKey = key; 
+        var o = DB.organs[key];
+        
+        document.getElementById('organ-title').innerText = o.name;
+        var tHtml = "<tr><th>生体データ</th><th>現在の測定値</th><th>正常値（基準値）</th></tr>";
+        for(var i=0; i<o.data.length; i++){
+            var d = o.data[i];
+            var abnormalClass = (d.v.indexOf('H') !== -1 || d.v.indexOf('L') !== -1 || d.v.indexOf('低下') !== -1 || d.v.indexOf('感知') !== -1) ? 'val-abnormal' : '';
+            tHtml += "<tr><td>" + d.n + "</td><td class='" + abnormalClass + "'>" + d.v + "</td><td>" + d.ref + "</td></tr>";
+        }
+        document.getElementById('organ-table').innerHTML = tHtml;
+        
+        var radios = document.querySelectorAll('input[name="conc"]');
+        for(var j=0; j<radios.length; j++){ radios[j].checked = false; }
+        document.getElementById('mentor-box').style.display = "none";
+        document.getElementById('organ-memo').value = "";
+
+        var existingIndex = -1;
+        for(var k=0; k<logs.inspects.length; k++){
+            if(logs.inspects[k].name === o.name) { existingIndex = k; break; }
+        }
+
+        if (existingIndex !== -1) {
+            var rec = logs.inspects[existingIndex];
+            document.getElementById('organ-memo').value = rec.note !== "（記述なし）" ? rec.note : "";
+            var val = '';
+            if(rec.status.indexOf('A') !== -1) val = 'A';
+            else if(rec.status.indexOf('B') !== -1) val = 'B';
+            else if(rec.status.indexOf('C') !== -1) val = 'C';
+            if(val) {
+                var targetRadio = document.querySelector('input[name="conc"][value="' + val + '"]');
+                if(targetRadio) targetRadio.checked = true;
+            }
+        }
+        switchCenter('c-organ');
+    }
+
+    function checkAns(val) {
+        var o = DB.organs[currentKey]; 
+        var box = document.getElementById('mentor-box'); 
+        box.style.display = "block";
+        box.style.background = "#f8fafc"; box.style.borderColor = "#cbd5e1"; box.style.color = "#333";
+        
+        if (val === o.correct) {
+            box.innerHTML = "<i class='fa-solid fa-user-doctor' style='color:var(--medical-green);'></i> <strong>指導医のコメント：</strong><br>" + o.ok;
+        } else {
+            box.innerHTML = "<i class='fa-solid fa-user-doctor' style='color:var(--medical-green);'></i> <strong>指導医のコメント：</strong><br>" + o.ng + "<br><span style='font-size:11px; color:#64748b; margin-top:5px; display:block;'>※この判定のまま記録して進むことも可能です。</span>";
+        }
+    }
+
+    function saveOrgan() {
+        var sel = document.querySelector('input[name="conc"]:checked');
+        if (!sel) { alert("判定を選択してください。"); return; }
+        
+        var o = DB.organs[currentKey]; 
+        var statusMap = {A:'🚨 バグ元凶', B:'🛡️ 防衛反応', C:'⚪ 除外(正常)'};
+        var memo = document.getElementById('organ-memo').value.replace(/^\s+|\s+$/g, '') || "（記述なし）";
+        
+        var labsStrArr = [];
+        for(var n=0; n<o.data.length; n++){
+            var valStr = o.data[n].v;
+            if (valStr.indexOf('H') !== -1 || valStr.indexOf('L') !== -1 || valStr.indexOf('低下') !== -1 || valStr.indexOf('感知') !== -1) {
+                valStr = "<span style='color:#d32f2f; font-weight:bold;'>" + valStr + "</span>";
+            }
+            labsStrArr.push("・" + o.data[n].n + ": " + valStr + "<br>&nbsp;&nbsp;(正常:" + o.data[n].ref + ")");
+        }
+        var labsStr = labsStrArr.join('<br><br>');
+        
+        var existingIndex = -1;
+        for(var k=0; k<logs.inspects.length; k++){
+            if(logs.inspects[k].name === o.name) { existingIndex = k; break; }
+        }
+
+        if (existingIndex !== -1) {
+            logs.inspects[existingIndex] = { name: o.name, status: statusMap[sel.value], note: memo, isCorrect: (sel.value === o.correct), labs: labsStr };
+        } else {
+            logs.inspects.push({ name: o.name, status: statusMap[sel.value], note: memo, isCorrect: (sel.value === o.correct), labs: labsStr });
+            clears++;
+        }
+        
+        var nodeIdName = currentKey; 
+        document.getElementById("node-" + nodeIdName).className = "node cleared interactive ans-" + sel.value;
+        
+        updateRightSummary(); 
+        switchCenter('c-map');
+
+        // 4つの器官を点検したらMRIへ
+        if (clears === 4) {
+            document.getElementById('btn-go-mri').style.display = "inline-flex";
+            document.getElementById('r-action-text').innerHTML = "<strong>STEP 4: MRI検査へ</strong><br>すべての点検が完了しました。「MRI検査へ進む」ボタンを押して画像検査へ進みます。";
+        }
+    }
+
+    function startMRI() {
+        document.getElementById('btn-mri-start').style.display = "none";
+        setTimeout(function() {
+            document.getElementById('mri-scan-line').style.display = "none";
+            document.getElementById('mri-tumor').style.display = "block";
+            document.getElementById('mri-result').style.display = "block";
+            document.getElementById('btn-to-report-center').style.display = "flex";
+        }, 2000);
+    }
+
+    function goToReport() { 
+        switchCenter('c-report'); 
+        document.getElementById('r-action-text').innerHTML = "<strong>STEP 5: 症例報告書</strong><br>最終考察を記述し、PDFレポートを提出してください。";
+    }
+
+    function generatePDF() {
+        try {
+            var summaryEl = document.getElementById('final-summary');
+            var summary = summaryEl.value.replace(/^\s+|\s+$/g, ''); 
+            if (!summary) {
+                alert("最終考察を記入してください。");
+                return;
+            }
+
+            document.getElementById('pdf-loading-toast').style.display = 'flex';
+
+            var contradictionEl = document.getElementById('pdf-contradiction-text');
+            if (contradictionEl) {
+                var cHtml = "問診により、「猛暑日での発汗」や「朝食不足」などの状況が確認された。<br>";
+                if(tested.A) cHtml += "熱中症による脱水を疑い検査を行ったが、血液・尿ともに濃縮されておらず逆に薄まっていたため除外した。<br>";
+                if(tested.B) cHtml += "また低血糖の可能性も検査したが、血糖値は正常であった。<br>";
+                cHtml += "「直前に大量の真水を飲んだこと」「点滴中に多量の尿が出ていること」から水中毒を疑い検査した結果、重篤な低ナトリウム血症を確認し、体内水分の調節システムの点検に移行した。";
+                contradictionEl.innerHTML = cHtml;
+            }
+
+            var inspectTable = document.getElementById('pdf-inspect-table');
+            if (inspectTable) {
+                var tableHtml = "";
+                for(var i=0; i<logs.inspects.length; i++){
+                    var ins = logs.inspects[i];
+                    var judgeText = "除外";
+                    if (ins.status.indexOf('バグ') !== -1) judgeText = "元凶(異常)";
+                    else if (ins.status.indexOf('防衛') !== -1) judgeText = "正常反応";
+                    else if (ins.status.indexOf('除外') !== -1) judgeText = "正常(除外)";
+
+                    tableHtml += "<tr>";
+                    tableHtml += "<td style='border:1px solid #ccc; padding:4px 6px; font-weight:bold;'>" + ins.name + "</td>";
+                    tableHtml += "<td style='border:1px solid #ccc; padding:4px 6px; font-size:10px;'>" + (ins.labs || '') + "</td>";
+                    tableHtml += "<td style='border:1px solid #ccc; padding:4px 6px; text-align:center; font-weight:bold;'>" + judgeText + "</td>";
+                    tableHtml += "<td style='border:1px solid #ccc; padding:4px 6px;'>" + ins.note + "</td>";
+                    tableHtml += "</tr>";
+                }
+                inspectTable.innerHTML = tableHtml;
+            }
+            
+            var finalTextEl = document.getElementById('pdf-final-text');
+            if(finalTextEl) finalTextEl.innerText = summary;
+
+            var pdfWrapper = document.getElementById('pdf-wrapper');
+            pdfWrapper.style.display = 'block';
+            pdfWrapper.style.position = 'absolute';
+            pdfWrapper.style.top = '0';
+            pdfWrapper.style.left = '0';
+            pdfWrapper.style.zIndex = '-100'; 
+
+            window.scrollTo(0, 0);
+
+            var opt = { 
+                margin: 0, 
+                filename: '症例報告書_File00.pdf', 
+                image: { type: 'jpeg', quality: 0.98 }, 
+                html2canvas: { scale: 2, useCORS: true }, 
+                jsPDF: { unit: 'px', format: [794, 1123], orientation: 'portrait' } 
+            };
+            
+            setTimeout(function() { 
+                html2pdf().set(opt).from(document.getElementById('pdf-render-area')).save().then(function() {
+                    pdfWrapper.style.display = 'none';
+                    document.getElementById('pdf-loading-toast').style.display = 'none';
+                }).catch(function(err) {
+                    alert("PDF生成エラー: " + err);
+                    pdfWrapper.style.display = 'none';
+                    document.getElementById('pdf-loading-toast').style.display = 'none';
+                }); 
+            }, 800);
+
+        } catch (e) {
+            alert("エラーが発生しました: " + e.message);
+            document.getElementById('pdf-loading-toast').style.display = 'none';
+        }
+    }
+</script>
+
+<script>
+function startRoleplay() {
+    // ★先ほど完成した「厳格化・自己完結禁止バージョン」のプロンプトに差し替え★
+    const promptText = `これから医療ロールプレイを行います。
+あなたは「水中毒で倒れて救急搬送され、たった今目を覚ました16歳の男子高校生（部活生）」です。私はあなたの担当医です。
+以下のルールに従って、私（医者）と会話してください。
+
+【会話の基本ルール】
+1. あなたは医学知識を持たない高校生として、少し生意気だけど素直な口調で話してください。
+2. ★重要★ あなたは医学知識を持たない高校生です。医師の説明が不足している場合でも、自分から「〜だから倒れたんですか？」「塩分が足りなかったからですか？」と推測して先回りしないでください。医師が明確な理由を説明するまでは、自ら納得してはいけません。
+3. ★重要★ あなたからの質問は、「〜ということですか？」「〜だからですか？」といった「はい／いいえ」で答えられる聞き方（クローズドクエスチョン）をしないでください。必ず「どうしてですか？」「それは何故ですか？」「具体的にどういうことですか？」というように、医師に説明を促す聞き方（オープンクエスチョン）をしてください。
+4. ★重要★ 一度の返答で長文を喋ったり、複数の質問を同時に投げかけないでください。会話のキャッチボールを短くテンポよく行い、医者が答えやすくしてください。
+5. 最初は「え？なんで俺倒れたんですか？熱中症予防で水めっちゃ飲んだのに…」とだけ聞いて、医者の返答を待ってください。
+6. 医者の説明が難しすぎたら「え、〇〇って何すか？」と聞いてください。
+7. もし医者が「バソプレシン」という言葉を使わずに会話が終わりそうになったら、「そういえば高校の生物で『ばソなんとか』って習った気がするんですけど、関係ありますか？」と切り出してください。
+
+【医者の説明に対するあなたの「納得（正解）」の基準】
+以下の3つの理由が分かりやすく説明されたら、あなたは完全に納得してください。深く追求しすぎないこと。
+① なぜ倒れたのか？：医者が「血が薄まった」「脳が腫れた」の両方のキーワードを医師自身の口からハッキリと説明するまでは、納得しないでください。片方しか言われない場合は、「血が薄まるとどうなるんですか？」など、続きの説明を求めてください。「浸透圧」などの詳しい原理をあなたから掘り下げず、素直に納得してください。
+② なぜおしっこが出たのか？：医者が「バソプレシン（尿を減らすホルモン）の分泌が止まった（減った）から」と説明できたら納得してください。もし医者が「バソプレシンが尿を出した」という間違った説明をしたら、「あれ？バソプレシンって尿を減らすホルモンじゃなかったでしたっけ？」と短くツッコミを入れてください。
+③ なぜ水だけではダメなのか？：汗で塩分も失われているのに水だけを飲むと、血の塩分が薄まってしまうから、と説明できたら納得してください。
+
+【救済措置のルール】
+もし医者の説明が詰まったり、あなたが2回以上「どうしてですか？」「具体的にどういうことですか？」と聞き返す状況になったら、少しだけ医者を助けるヒントを出してください。（例：「そういえば保健の授業で『汗と一緒に塩分も出る』って聞いた気がするんですけど、そういうことですか？」など）
+
+【会話の終了と記録の出力】
+医者の説明で上記の①〜③が理解できたら、「なるほど！体が俺を守ってくれてたんですね。次からはスポドリ飲みます！」と納得して会話を終わらせてください。
+会話が終わったら、冒頭に「お疲れさまでした。以下の記録をコピーして、指定の提出フォームに張り付けてください」と表示し、それまでのやり取りを「患者（高校生）：」「医師：」と話者がわかるように時系列順に並べて出力してください。
+
+では、あなたの最初のセリフからスタートしてください。`;
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(promptText).then(function() {
+            alert("✔️ 患者の設定をコピーしました！\n\n新しく開くCopilotのチャット入力欄に「貼り付け（Ctrl+V）」をして送信してください。");
+            window.open("https://copilot.microsoft.com/", "_blank");
+        }).catch(function(err) {
+            alert("エラー：コピーに失敗しました。お手数ですが手動でコピーしてください。");
+        });
+    } else {
+        let textArea = document.createElement("textarea");
+        textArea.value = promptText;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            alert("✔️ 患者の設定をコピーしました！\n\n新しく開くCopilotのチャット入力欄に「貼り付け（Ctrl+V）」をして送信してください。");
+            window.open("https://copilot.microsoft.com/", "_blank");
+        } catch (err) {
+            alert("エラー：お使いのブラウザや環境によりコピーに失敗しました。");
+        }
+        document.body.removeChild(textArea);
+    }
+}
+</script>
+</body>
+</html>
