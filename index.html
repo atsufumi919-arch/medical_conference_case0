@@ -804,7 +804,7 @@
         document.getElementById('r-action-text').innerHTML = "<strong>STEP 5: 症例報告書</strong><br>最終考察を記述し、PDFレポートを提出してください。";
     }
 
-    function generatePDF() {
+ 　 function generatePDF() {
         try {
             var summaryEl = document.getElementById('final-summary');
             var summary = summaryEl.value.replace(/^\s+|\s+$/g, ''); 
@@ -813,7 +813,10 @@
                 return;
             }
 
-            document.getElementById('pdf-loading-toast').style.display = 'flex';
+            var toast = document.getElementById('pdf-loading-toast');
+            // 初期状態のローディング画面をセット
+            toast.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="font-size:40px; color:var(--medical-green); margin-bottom:15px;"></i><div style="font-size:18px; font-weight:bold; color:var(--medical-green);">症例報告書（PDF）を作成しています...</div>';
+            toast.style.display = 'flex';
 
             var contradictionEl = document.getElementById('pdf-contradiction-text');
             if (contradictionEl) {
@@ -864,14 +867,33 @@
                 jsPDF: { unit: 'px', format: [794, 1123], orientation: 'portrait' } 
             };
             
+            // ★PDF下部の見切れ対策：レンダリングエリアの高さを1123pxから1080pxに縮めて枠内に収める
+            document.getElementById('pdf-render-area').style.height = "1080px";
+            
             setTimeout(function() { 
-                html2pdf().set(opt).from(document.getElementById('pdf-render-area')).save().then(function() {
+                // ★Safariでの「戻る」対策：自動保存(save)せず、Blob(データ)として出力する
+                html2pdf().set(opt).from(document.getElementById('pdf-render-area')).output('blob').then(function(pdfBlob) {
                     pdfWrapper.style.display = 'none';
-                    document.getElementById('pdf-loading-toast').style.display = 'none';
+                    
+                    // Blobから一時的なURLを生成
+                    var pdfUrl = URL.createObjectURL(pdfBlob);
+                    
+                    // ローディング画面を「完了ボタン画面」に書き換える
+                    toast.innerHTML = 
+                        '<i class="fa-solid fa-file-pdf" style="font-size:50px; color:var(--medical-green); margin-bottom:15px;"></i>' +
+                        '<div style="font-size:22px; font-weight:bold; color:var(--medical-green); margin-bottom: 10px;">PDFの作成が完了しました</div>' +
+                        '<div style="font-size:12px; color:#b91c1c; font-weight:bold; margin-bottom: 20px; background:#fee2e2; padding:8px; border-radius:4px;">※注意：ブラウザの「戻る」ボタンは押さないでください！</div>' +
+                        '<a href="' + pdfUrl + '" target="_blank" class="btn btn-primary" style="width: 280px; text-decoration: none; margin-bottom: 15px; font-size:15px;">' +
+                        '<i class="fa-solid fa-arrow-up-right-from-square"></i> PDFを別タブで開く / 保存' +
+                        '</a>' +
+                        '<button class="btn" style="width: 280px; justify-content: center; background: #f1f5f9; color:#333;" onclick="document.getElementById(\'pdf-loading-toast\').style.display=\'none\';">' +
+                        '<i class="fa-solid fa-arrow-left"></i> 元の画面に戻る' +
+                        '</button>';
+
                 }).catch(function(err) {
                     alert("PDF生成エラー: " + err);
                     pdfWrapper.style.display = 'none';
-                    document.getElementById('pdf-loading-toast').style.display = 'none';
+                    toast.style.display = 'none';
                 }); 
             }, 800);
 
