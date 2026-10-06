@@ -17,7 +17,8 @@
             --border-color: #cbd5e1;
         }
 
-        body { font-family: 'Noto Sans JP', sans-serif; background-color: var(--bg-gray); margin: 0; padding: 12px; color: var(--text-dark); height: 100vh; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
+        /* 修正ポイント：高さを固定せず、はみ出た場合は縦スクロール(overflow-y: auto)を許可 */
+        body { font-family: 'Noto Sans JP', sans-serif; background-color: var(--bg-gray); margin: 0; padding: 12px; color: var(--text-dark); min-height: 100vh; box-sizing: border-box; overflow-y: auto; display: flex; flex-direction: column; }
         
         /* 共通ボタン */
         .btn { padding: 12px 15px; border: 2px solid var(--border-color); border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s; display: flex; align-items: center; gap: 8px; background: #fff; width: 100%; text-align: left; margin-bottom: 10px; box-sizing: border-box; line-height: 1.4; color: var(--text-dark); }
@@ -43,9 +44,10 @@
         .locked-card .p-card-header { background: #64748b; }
 
         /* メイン2カラムレイアウト（左パネルを削除） */
-        #view-main { display: none; grid-template-columns: 1fr 340px; gap: 15px; padding: 5px; height: 98vh; box-sizing: border-box; max-width: 1400px; margin: 0 auto; width: 100%; }
+        /* 修正ポイント：height: 98vh を外し、中身に合わせて伸びるように変更 */
+        #view-main { display: none; grid-template-columns: 1fr 340px; gap: 15px; padding: 5px; min-height: 95vh; height: auto; box-sizing: border-box; max-width: 1400px; margin: 0 auto; width: 100%; }
 
-        .panel { background: #ffffff; border: 2px solid var(--medical-green); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); height: 100%; }
+        .panel { background: #ffffff; border: 2px solid var(--medical-green); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); height: 100%; min-height: 550px; }
         .panel-header { background: var(--medical-green); color: white; padding: 10px 15px; font-weight: bold; font-size: 14px; flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
         .panel-content { padding: 12px; overflow-y: auto; flex-grow: 1; position: relative; display: flex; flex-direction: column; }
 
@@ -203,8 +205,6 @@
 
 <div class="app-container" id="view-main">
     
-    <!-- ※左パネル（患者プロファイル）は2カラム化に伴い削除されました -->
-
     <div class="panel" style="padding: 0;">
         
         <div id="c-chat" class="center-view active">
