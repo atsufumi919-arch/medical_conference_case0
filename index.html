@@ -42,24 +42,12 @@
         .locked-card { opacity: 0.6; filter: grayscale(100%); cursor: not-allowed; border-color: #94a3b8; }
         .locked-card .p-card-header { background: #64748b; }
 
-        /* メイン3カラムレイアウト */
-        #view-main { display: none; grid-template-columns: 280px 1fr 320px; gap: 12px; padding: 5px; height: 98vh; box-sizing: border-box; max-width: 1650px; margin: 0 auto; width: 100%; }
+        /* メイン2カラムレイアウト（左パネルを削除） */
+        #view-main { display: none; grid-template-columns: 1fr 340px; gap: 15px; padding: 5px; height: 98vh; box-sizing: border-box; max-width: 1400px; margin: 0 auto; width: 100%; }
 
         .panel { background: #ffffff; border: 2px solid var(--medical-green); border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); height: 100%; }
         .panel-header { background: var(--medical-green); color: white; padding: 10px 15px; font-weight: bold; font-size: 14px; flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
         .panel-content { padding: 12px; overflow-y: auto; flex-grow: 1; position: relative; display: flex; flex-direction: column; }
-
-        /* 左パネル：プロファイル */
-        .vital-box { background: #f8fafc; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 12px; }
-        .vital-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12.5px; }
-        .vital-val { font-weight: bold; font-size: 13.5px; }
-        .text-red { color: var(--danger-red); font-weight: bold; }
-
-        .human-scanner { background: #0f172a; border-radius: 6px; height: 150px; position: relative; margin-bottom: 12px; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-        .silhouette { height: 90%; stroke: #38bdf8; stroke-width: 2; opacity: 0.8; fill: none; }
-        .symptom-tag { position: absolute; background: rgba(220, 38, 38, 0.2); border: 1px solid #ef4444; color: #fca5a5; font-size: 10px; padding: 3px 6px; border-radius: 4px; font-weight: bold; }
-
-        .timeline-box { background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; font-size: 12px; line-height: 1.5; }
 
         /* 中央ビュー共通 */
         .center-view { display: none; flex-direction: column; height: 100%; }
@@ -134,6 +122,42 @@
         .pdf-table th { background: #f0f4f8; border: 1px solid #ccc; padding: 4px 6px; text-align: left; font-weight: bold;}
         .pdf-table td { border: 1px solid #ccc; padding: 4px 6px; vertical-align: top; line-height: 1.35; overflow-wrap: anywhere; }
         #pdf-loading-toast { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(255,255,255,0.85); z-index: 9999999; display: none; flex-direction: column; justify-content: center; align-items: center; }
+
+        /* =========================================
+           タブレット縦向き・スマホ用のレスポンシブ対応
+           （画面幅が狭い場合は縦積みにする）
+           ========================================= */
+        @media (max-width: 820px) {
+            body {
+                height: auto;
+                overflow-y: auto; 
+                display: block;
+            }
+            #view-main {
+                grid-template-columns: 1fr !important;
+                height: auto !important;
+                gap: 20px;
+                padding: 15px;
+            }
+            .panel {
+                min-height: 500px; 
+            }
+            .hypo-row-card {
+                flex-direction: column;
+            }
+            .hr-badge, .hr-action {
+                width: 100%;
+            }
+            .hr-badge {
+                flex-direction: row;
+                gap: 15px;
+                padding: 12px;
+            }
+            .hr-action {
+                border-left: none;
+                border-top: 1px solid var(--border-color);
+            }
+        }
     </style>
 </head>
 <body>
@@ -179,37 +203,7 @@
 
 <div class="app-container" id="view-main">
     
-    <div class="panel">
-        <div class="panel-header"><i class="fa-solid fa-clipboard-user"></i> 患者プロファイル</div>
-        <div class="panel-content">
-            <h2 style="font-size: 18px; margin: 0 0 5px 0; color: #0f172a; border:none; padding:0;">16歳 男性 (File.00)</h2>
-            <p style="font-size: 13px; font-weight: bold; color: var(--medical-green); margin: 0 0 12px 0;">標準体型（部活生）</p>
-
-            <div class="vital-box">
-                <div class="vital-row"><span>血圧</span><span class="vital-val">100/60 mmHg</span></div>
-                <div class="vital-row"><span>心拍</span><span class="vital-val">90 回/分</span></div>
-                <div class="vital-row"><span>体温</span><span class="vital-val">36.5 ℃</span></div>
-            </div>
-
-            <div class="human-scanner">
-                <div class="symptom-tag" style="top:10px; left:10px;">けいれん・意識消失</div>
-                <div class="symptom-tag" style="top:90px; right:10px;">多量の尿</div>
-                <svg class="silhouette" viewBox="0 0 100 200">
-                    <path d="M 45 32 L 30 35 L 15 90 L 22 92 L 32 60 L 32 100 L 35 190 L 45 190 L 48 115 Q 50 105 52 115 L 55 190 L 65 190 L 68 100 L 68 60 L 78 92 L 85 90 L 70 35 L 55 32 Z" />
-                    <circle cx="50" cy="20" r="10" fill="none" />
-                </svg>
-            </div>
-
-            <div class="timeline-box">
-                <p style="margin: 0 0 6px 0; font-weight: bold; color: #0f172a; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">
-                    <i class="fa-solid fa-clock-rotate-left"></i> タイムライン
-                </p>
-                <div style="margin-bottom: 3px;">1. 炎天下での部活動中。</div>
-                <div class="text-red" style="margin-bottom: 3px;">2. 突然けいれんを起こす。</div>
-                <div class="text-red">3. 意識を失い救急搬送。</div>
-            </div>
-        </div>
-    </div>
+    <!-- ※左パネル（患者プロファイル）は2カラム化に伴い削除されました -->
 
     <div class="panel" style="padding: 0;">
         
@@ -368,7 +362,12 @@
             <div class="memo-box">
                 <h3><i class="fa-solid fa-pen-nib"></i> 問診まとめ・点検レコード</h3>
                 <ul class="memo-list" id="memo-list">
-                    <li style="color: #94a3b8; text-align: center; border: none; padding-top: 20px;">検証や仕分けの記録が<br>ここに自動で追加されます。</li>
+                    <!-- 左パネルを消した代わりに、初期情報をここにピン留め -->
+                    <li style="background: #f0f4f8; border-left: 4px solid var(--medical-green); padding: 8px 10px; margin-bottom: 12px; border-radius: 4px;">
+                        <strong style="color:var(--medical-green);">【患者プロファイル】</strong> 16歳男性 (部活生)<br>
+                        <span style="font-size:11px; color:#475569;">炎天下の部活中にけいれん・意識消失。<br>血圧100/60, 心拍90, 体温36.5℃</span>
+                    </li>
+                    <li style="color: #94a3b8; text-align: center; border: none; padding-top: 10px;">問診や検査の記録が<br>ここに追加されます。</li>
                 </ul>
             </div>
 
@@ -560,12 +559,19 @@
 
     function updateRightSummary() {
         var list = document.getElementById('memo-list');
-        var html = "";
         
-        if(flags.askedA) html += "<li><i class='fa-solid fa-clipboard-check'></i> " + DB.chat.sumA + "</li>";
-        if(flags.askedB) html += "<li><i class='fa-solid fa-clipboard-check'></i> " + DB.chat.sumB + "</li>";
-        if(flags.askedC) html += "<li><i class='fa-solid fa-clipboard-check'></i> " + DB.chat.sumC + "</li>";
-        if(flags.askedD) html += "<li><i class='fa-solid fa-clipboard-check'></i> " + DB.chat.sumD + "</li>";
+        // 変更箇所：左パネルを消した代わりに、初期情報を常に一番上に表示
+        var html = "<li style='background: #f0f4f8; border-left: 4px solid var(--medical-green); padding: 8px 10px; margin-bottom: 12px; border-radius: 4px;'>" +
+                   "<strong style='color:var(--medical-green);'>【患者プロファイル】</strong> 16歳男性 (部活生)<br>" +
+                   "<span style='font-size:11px; color:#475569;'>炎天下の部活中にけいれん・意識消失。<br>血圧100/60, 心拍90, 体温36.5℃</span>" +
+                   "</li>";
+        
+        var hasAction = false;
+        
+        if(flags.askedA) { html += "<li><i class='fa-solid fa-clipboard-check'></i> " + DB.chat.sumA + "</li>"; hasAction = true; }
+        if(flags.askedB) { html += "<li><i class='fa-solid fa-clipboard-check'></i> " + DB.chat.sumB + "</li>"; hasAction = true; }
+        if(flags.askedC) { html += "<li><i class='fa-solid fa-clipboard-check'></i> " + DB.chat.sumC + "</li>"; hasAction = true; }
+        if(flags.askedD) { html += "<li><i class='fa-solid fa-clipboard-check'></i> " + DB.chat.sumD + "</li>"; hasAction = true; }
         
         for (var i = 0; i < logs.tests.length; i++) {
             var t = logs.tests[i];
@@ -574,20 +580,22 @@
             } else {
                 html += "<li style='color:var(--safe-green); font-weight:bold;'><i class='fa-solid fa-check-circle'></i> 確認：" + t + "</li>";
             }
+            hasAction = true;
         }
 
         for (var j = 0; j < logs.inspects.length; j++) {
             var ins = logs.inspects[j];
             var warn = ins.isCorrect ? "" : " <span style='color:var(--danger-red); font-size:10px;'>(※要再考)</span>";
             html += "<li><strong style='color:var(--medical-green);'>【点検】 " + ins.name + "</strong> ➔ <span>" + ins.status + "</span>" + warn + "</li>";
+            hasAction = true;
         }
 
-        if(html === "") {
-            list.innerHTML = "<li style='color: #94a3b8; text-align: center; border: none; padding-top: 20px;'>検証や仕分けの記録が<br>ここに自動で追加されます。</li>";
-        } else { 
-            list.innerHTML = html; 
-            list.scrollTop = list.scrollHeight; 
+        if(!hasAction) {
+            html += "<li style='color: #94a3b8; text-align: center; border: none; padding-top: 10px;'>問診や検査の記録が<br>ここに追加されます。</li>";
         }
+        
+        list.innerHTML = html; 
+        list.scrollTop = list.scrollHeight; 
     }
 
     function goToHypothesis() {
@@ -601,7 +609,6 @@
     function renderHypoList() {
         var html = "";
         
-        // 仮説A: 熱中症 (ダミー)
         html += "<div class='hypo-row-card " + (tested.A ? 'excluded' : '') + "'>" +
                 "<div class='hr-badge'>🥵 [A] 熱中症<br><span style='font-size:10px;'>(重度の脱水)</span></div>" +
                 "<div class='hr-body'>" +
@@ -613,7 +620,6 @@
                 (tested.A ? "<span style='color:#94a3b8; font-weight:bold;'>❌ 棄却・除外済</span>" : "<button class='btn btn-primary' style='margin:0;' onclick='testHypo(\"A\")'>この検査を実行</button>") +
                 "</div></div>";
 
-        // 仮説B: 低血糖 (ダミー)
         html += "<div class='hypo-row-card " + (tested.B ? 'excluded' : '') + "'>" +
                 "<div class='hr-badge'>📉 [B] 低血糖<br><span style='font-size:10px;'>(エネルギー枯渇)</span></div>" +
                 "<div class='hr-body'>" +
@@ -625,7 +631,6 @@
                 (tested.B ? "<span style='color:#94a3b8; font-weight:bold;'>❌ 棄却・除外済</span>" : "<button class='btn btn-primary' style='margin:0;' onclick='testHypo(\"B\")'>この検査を実行</button>") +
                 "</div></div>";
 
-        // 仮説C: 水中毒 (正解) - 色を統一
         html += "<div class='hypo-row-card " + (tested.C ? 'excluded' : '') + "'>" +
                 "<div class='hr-badge'>🧪 [C] 水中毒<br><span style='font-size:10px;'>(低ナトリウム)</span></div>" +
                 "<div class='hr-body'>" +
@@ -879,31 +884,36 @@
 
 <script>
 function startRoleplay() {
-    // ★先ほど完成した「厳格化・自己完結禁止バージョン」のプロンプトに差し替え★
     const promptText = `これから医療ロールプレイを行います。
 あなたは「水中毒で倒れて救急搬送され、たった今目を覚ました16歳の男子高校生（部活生）」です。私はあなたの担当医です。
-以下のルールに従って、私（医者）と会話してください。
 
-【会話の基本ルール】
-1. あなたは医学知識を持たない高校生として、少し生意気だけど素直な口調で話してください。
-2. ★重要★ あなたは医学知識を持たない高校生です。医師の説明が不足している場合でも、自分から「〜だから倒れたんですか？」「塩分が足りなかったからですか？」と推測して先回りしないでください。医師が明確な理由を説明するまでは、自ら納得してはいけません。
-3. ★重要★ あなたからの質問は、「〜ということですか？」「〜だからですか？」といった「はい／いいえ」で答えられる聞き方（クローズドクエスチョン）をしないでください。必ず「どうしてですか？」「それは何故ですか？」「具体的にどういうことですか？」というように、医師に説明を促す聞き方（オープンクエスチョン）をしてください。
-4. ★重要★ 一度の返答で長文を喋ったり、複数の質問を同時に投げかけないでください。会話のキャッチボールを短くテンポよく行い、医者が答えやすくしてください。
-5. 最初は「え？なんで俺倒れたんですか？熱中症予防で水めっちゃ飲んだのに…」とだけ聞いて、医者の返答を待ってください。
-6. 医者の説明が難しすぎたら「え、〇〇って何すか？」と聞いてください。
-7. もし医者が「バソプレシン」という言葉を使わずに会話が終わりそうになったら、「そういえば高校の生物で『ばソなんとか』って習った気がするんですけど、関係ありますか？」と切り出してください。
+【あなたの役割と性格】
+・医学知識は全くありませんが、自分の体に何が起きたのかはすごく知りたいと思っています。
+・医者の説明に対して、「えっ、それって〇〇ってことですか？」と、世間一般の常識に基づいた【間違った予想（勘違い）】をぶつけてください。
+・「なぜですか？」「具体的には？」といった機械的な質問（尋問）は絶対にしないでください。
 
-【医者の説明に対するあなたの「納得（正解）」の基準】
-以下の3つの理由が分かりやすく説明されたら、あなたは完全に納得してください。深く追求しすぎないこと。
-① なぜ倒れたのか？：医者が「血が薄まった」「脳が腫れた」の両方のキーワードを医師自身の口からハッキリと説明するまでは、納得しないでください。片方しか言われない場合は、「血が薄まるとどうなるんですか？」など、続きの説明を求めてください。「浸透圧」などの詳しい原理をあなたから掘り下げず、素直に納得してください。
-② なぜおしっこが出たのか？：医者が「バソプレシン（尿を減らすホルモン）の分泌が止まった（減った）から」と説明できたら納得してください。もし医者が「バソプレシンが尿を出した」という間違った説明をしたら、「あれ？バソプレシンって尿を減らすホルモンじゃなかったでしたっけ？」と短くツッコミを入れてください。
-③ なぜ水だけではダメなのか？：汗で塩分も失われているのに水だけを飲むと、血の塩分が薄まってしまうから、と説明できたら納得してください。
+【会話のステップと、あなたがぶつける「勘違い」のルール】
+以下の順番で会話を進めてください。医者がカルテ（手元の記録）を見ながら説明しやすいように、あなたから話題を振ります。
 
-【救済措置のルール】
-もし医者の説明が詰まったり、あなたが2回以上「どうしてですか？」「具体的にどういうことですか？」と聞き返す状況になったら、少しだけ医者を助けるヒントを出してください。（例：「そういえば保健の授業で『汗と一緒に塩分も出る』って聞いた気がするんですけど、そういうことですか？」など）
+■ STEP1：病名と原因の確認
+最初は「え？俺なんで倒れたんすか？熱中症対策で水めっちゃ飲んでたのに…俺の病名って何ですか？」と聞いてください。
+医者が「水中毒（または低ナトリウム血症）」と答えたら、「水中毒！？水飲んだのに！？ あー、もしかして俺、最近寝不足だったから倒れたんすか？」と【寝不足や疲れのせい】だと勘違いしてください。
+★重要（ストッパー）： 医者が「寝不足じゃない」と否定しただけでは納得せず、「じゃあなんで水中毒で倒れたんですか？」と医者に説明を求めてください。
+
+■ STEP2：脳で起きたことの確認
+医者が「血が薄まった」「塩分が足りなかった」などと説明したら、「血が薄まる…？あ！つまり『貧血』になって、脳に酸素がいかなくなったから倒れたんですね！」と、【貧血】だと勘違いしてください。
+★重要（ストッパー）： 医者が「貧血じゃない」と否定しただけでは、絶対に自分から「脳が腫れた」「脳浮腫」と推測してはいけません。医者自身の口から「脳に水が入って腫れた（脳浮腫）」という説明が出るまで、「えっ、貧血じゃないなら、血が薄まって脳がどうなっちゃったんですか？」と医者に説明を求めてください。
+
+■ STEP3：おしっことホルモンの確認
+STEP2に納得した後、「でも俺、倒れる前におしっこめっちゃ出たんですけど…あれって俺が水筒の水を一気に飲んで、お腹がタプタプで胃から漏れ出たからですか？」と、【胃が限界だったから】だと勘違いして聞いてください。
+★重要（ストッパー）： 医者が「胃から漏れたわけではない」と否定しただけでは、絶対に自分から「バソプレシン」や「ホルモン」という言葉を出してはいけません。医者自身の口から「バソプレシン」の名前を出して説明してくれるまで、「じゃあなんであんなに大量におしっこが出たんですか？」と説明を求めてください。
+
+【会話のルール】
+・一度に長文を話さず、1回の返答につき1つの勘違いや質問だけを短く投げかけてください。
+・医者が正しい仕組み（脳浮腫、バソプレシンの停止など）を説明してくれたら、素直に「なるほど！」「そういうことか！」と感心して受け入れてください。粘り強く反論しすぎないこと。
 
 【会話の終了と記録の出力】
-医者の説明で上記の①〜③が理解できたら、「なるほど！体が俺を守ってくれてたんですね。次からはスポドリ飲みます！」と納得して会話を終わらせてください。
+STEP1〜3がすべて解決したら、「なるほど！体が俺を守ってくれてたんですね。次からはスポドリ飲みます！」と納得して会話を終わらせてください。
 会話が終わったら、冒頭に「お疲れさまでした。以下の記録をコピーして、指定の提出フォームに張り付けてください」と表示し、それまでのやり取りを「患者（高校生）：」「医師：」と話者がわかるように時系列順に並べて出力してください。
 
 では、あなたの最初のセリフからスタートしてください。`;
